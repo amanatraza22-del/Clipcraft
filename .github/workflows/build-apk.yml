@@ -1,4 +1,4 @@
-name: Build ClipCraft Debug APK
+name: Build ClipCraft APK
 
 on:
   push:
@@ -53,7 +53,9 @@ jobs:
                 -dname "CN=Android Debug,O=Android,C=US"
             fi
           fi
-          ls -lh debug.keystore
+          cp debug.keystore /tmp/release-upload.jks
+          keytool -changealias -keystore /tmp/release-upload.jks -alias androiddebugkey -destalias upload -storepass android -keypass android
+          ls -lh debug.keystore /tmp/release-upload.jks
           keytool -list -v -keystore debug.keystore -storepass android | grep -E "SHA1:|SHA256:" || true
 
       - name: Set up Gradle 9.3.1
@@ -61,8 +63,23 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
-      - name: Build Debug APK
-        run: gradle assembleDebug --no-daemon --no-configuration-cache -Dorg.gradle.jvmargs="-Xmx3g" --stacktrace
+      - name: Build Release & Debug APKs
+        env:
+          KEYSTORE_PATH: /tmp/release-upload.jks
+          STORE_PASSWORD: android
+          KEY_PASSWORD: android
+        run: gradle assembleRelease assembleDebug --no-daemon --no-configuration-cache -Dorg.gradle.jvmargs="-Xmx3g" --stacktrace
+
+      - name: Clean up temporary release keystore
+        if: always()
+        run: rm -f /tmp/release-upload.jks
+
+      - name: Upload ClipCraft Release APK (Recommended for Phone)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ClipCraft-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
 
       - name: Upload ClipCraft Debug APK
         uses: actions/upload-artifact@v4

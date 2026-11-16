@@ -20,7 +20,8 @@ data class SecurityPostureReport(
     val scorePercent: Int,
     val checks: List<SecurityCheckItem>,
     val isScreenShieldEnabled: Boolean,
-    val debuggerAttached: Boolean
+    val debuggerAttached: Boolean,
+    val debugAppCheckToken: String? = null
 )
 
 object SecurityAuditor {
@@ -122,7 +123,8 @@ object SecurityAuditor {
             scorePercent = score,
             checks = checks,
             isScreenShieldEnabled = screenShieldEnabled,
-            debuggerAttached = debuggerAttached
+            debuggerAttached = debuggerAttached,
+            debugAppCheckToken = readDebugAppCheckToken(context)
         )
     }
 }
