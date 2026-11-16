@@ -1,0 +1,87 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidShortProject(data) {
+      return data.userId is string && data.userId == request.auth.uid && data.userId.size() <= 128 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 100 &&
+             data.topic is string && data.topic.size() >= 1 && data.topic.size() <= 500 &&
+             data.style in ['Viral Hook', 'Explainer', 'Storytime', 'Product Spotlight', 'Motivation'] &&
+             data.durationSec is int && data.durationSec >= 10 && data.durationSec <= 30 &&
+             data.voiceProfile in ['Studio Pro', 'Energetic', 'Calm Narrator', 'Hype Host'] &&
+             data.captionStyle in ['Neon Pop', 'Cinema Box', 'Bold Minimal', 'Karaoke'] &&
+             data.backdropTheme in ['Cyber Aurora', 'Warm Liquid', 'Obsidian Grid'] &&
+             data.voiceoverScript is string && data.voiceoverScript.size() >= 1 && data.voiceoverScript.size() <= 1200 &&
+             data.securityVerified is bool &&
+             data.scenes is list && data.scenes.size() <= 8 &&
+             (data.scenes.size() == 0 || (
+               data.scenes[0] is map &&
+               data.scenes[0].caption is string && data.scenes[0].caption.size() >= 1 && data.scenes[0].caption.size() <= 160 &&
+               data.scenes[0].startMs is int && data.scenes[0].startMs >= 0 &&
+               data.scenes[0].endMs is int && data.scenes[0].endMs > data.scenes[0].startMs
+             ));
+    }
+
+    match /users/{userId}/shorts/{shortId} {
+      allow list: if isOwner(userId);
+      allow get: if isOwner(userId) && isValidId(shortId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(shortId) &&
+                       incoming().keys().hasAll([
+                         'userId', 'title', 'topic', 'style', 'durationSec',
+                         'voiceProfile', 'captionStyle', 'backdropTheme',
+                         'voiceoverScript', 'scenes', 'securityVerified',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'title', 'topic', 'style', 'durationSec',
+                         'voiceProfile', 'captionStyle', 'backdropTheme',
+                         'voiceoverScript', 'scenes', 'securityVerified',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidShortProject(incoming());
+
+      allow update: if isOwner(userId) &&
+                       isValidId(shortId) &&
+                       isValidShortProject(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'title', 'topic', 'style', 'durationSec',
+                         'voiceProfile', 'captionStyle', 'backdropTheme',
+                         'voiceoverScript', 'scenes', 'securityVerified',
+                         'updatedAt'
+                       ]);
+
+      allow delete: if isOwner(userId) && isValidId(shortId);
+    }
+  }
+}

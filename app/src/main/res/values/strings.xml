@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">ClipCraft</string>
+    <string name="sign_in_with_google">Sign in with Google</string>
+    <string name="auth_headline">Craft 20s AI Shorts.\nLocked Down by Design.</string>
+    <string name="auth_subtitle">Generate scripts, automated captions, and AI voiceovers free — protected by App Check &amp; Zero-Trust security.</string>
+    <string name="generate_short_cta">Generate 20s AI Short</string>
+    <string name="export_mp4_cta">Render Free MP4</string>
+    <string name="save_gallery_cta">Save to Gallery</string>
+    <string name="share_short_cta">Share Short</string>
+    <string name="nav_studio">Studio</string>
+    <string name="nav_library">Shorts</string>
+    <string name="nav_security">Shield</string>
+</resources>

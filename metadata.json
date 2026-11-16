@@ -1,0 +1,6 @@
+{
+  "name": "ClipCraft",
+  "description": "AI-powered 20-second short video creator with automated captions, AI voiceovers, and zero-trust security.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,92 @@
+{
+  "entities": {
+    "ShortProject": {
+      "title": "ShortProject",
+      "description": "A user-owned 20-second vertical AI short video project with script, voiceover settings, and timed captions.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated Firebase UID of the project owner."
+        },
+        "title": {
+          "type": "string",
+          "description": "Short video project title (1-100 chars)."
+        },
+        "topic": {
+          "type": "string",
+          "description": "Sanitized prompt or topic used to generate the short (1-500 chars)."
+        },
+        "style": {
+          "type": "string",
+          "enum": ["Viral Hook", "Explainer", "Storytime", "Product Spotlight", "Motivation"],
+          "description": "Creative format style for the short."
+        },
+        "durationSec": {
+          "type": "integer",
+          "description": "Target short duration in seconds (10-30, default 20)."
+        },
+        "voiceProfile": {
+          "type": "string",
+          "enum": ["Studio Pro", "Energetic", "Calm Narrator", "Hype Host"],
+          "description": "AI voiceover tone profile."
+        },
+        "captionStyle": {
+          "type": "string",
+          "enum": ["Neon Pop", "Cinema Box", "Bold Minimal", "Karaoke"],
+          "description": "Automated caption visual preset."
+        },
+        "backdropTheme": {
+          "type": "string",
+          "enum": ["Cyber Aurora", "Warm Liquid", "Obsidian Grid"],
+          "description": "Visual backdrop preset for rendered frames."
+        },
+        "voiceoverScript": {
+          "type": "string",
+          "description": "Full spoken narration script for AI voiceover (1-1200 chars)."
+        },
+        "scenes": {
+          "type": "array",
+          "description": "Ordered list of up to 8 timed caption scenes covering the short duration."
+        },
+        "securityVerified": {
+          "type": "boolean",
+          "description": "True when sanitized by InputSanitizer and attested by App Check."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp updated via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": [
+        "userId",
+        "title",
+        "topic",
+        "style",
+        "durationSec",
+        "voiceProfile",
+        "captionStyle",
+        "backdropTheme",
+        "voiceoverScript",
+        "scenes",
+        "securityVerified",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/shorts/{shortId}": {
+      "schema": {
+        "$ref": "#/entities/ShortProject"
+      },
+      "description": "User-isolated short video projects owned strictly by userId."
+    }
+  }
+}

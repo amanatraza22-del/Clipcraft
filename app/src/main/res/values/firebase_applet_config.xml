@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<resources>
+    <string name="firestore_database_id" translatable="false">ai-studio-android-clipcraf-bdf3a1d2-d675-4038-9619-44a06279edc2</string>
+    <string name="recaptcha_site_key" translatable="false">6LcC_CIuAAAAAOqpqZvwmcwEO8JPaUT40wlIilAm</string>
+</resources>
