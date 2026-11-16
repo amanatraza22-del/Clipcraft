@@ -20,7 +20,6 @@ jobs:
 
       - name: Verify Android SDK & accept licenses
         run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
           SDK_DIR="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
           echo "ANDROID_HOME=$SDK_DIR" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$SDK_DIR" >> "$GITHUB_ENV"
@@ -29,12 +28,20 @@ jobs:
             yes | "$SDK_MANAGER" --licenses > /dev/null 2>&1 || true
           fi
 
-      - name: Decode debug keystore
+      - name: Prepare debug keystore
         run: |
-          if [ ! -f debug.keystore ] && [ -f debug.keystore.base64 ]; then
-            tr -d '\r\n' < debug.keystore.base64 | base64 -d > debug.keystore
+          if [ ! -f debug.keystore ]; then
+            if [ -f debug.keystore.base64 ]; then
+              tr -d '\r\n' < debug.keystore.base64 | base64 -d > debug.keystore
+            else
+              keytool -genkeypair -v -keystore debug.keystore \
+                -storepass android -alias androiddebugkey -keypass android \
+                -keyalg RSA -keysize 2048 -validity 10000 \
+                -dname "CN=Android Debug,O=Android,C=US"
+            fi
           fi
           ls -lh debug.keystore
+          keytool -list -v -keystore debug.keystore -storepass android | grep -E "SHA1:|SHA256:" || true
 
       - name: Set up Gradle 9.3.1
         uses: gradle/actions/setup-gradle@v4
