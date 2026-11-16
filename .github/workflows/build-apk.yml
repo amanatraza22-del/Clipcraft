@@ -12,20 +12,25 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Accept Android SDK licenses
+        run: |
+          SDK_MANAGER=$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}" -name sdkmanager 2>/dev/null | head -n 1 || true)
+          if [ -n "$SDK_MANAGER" ]; then
+            yes | "$SDK_MANAGER" --licenses > /dev/null 2>&1 || true
+          fi
 
       - name: Decode debug keystore
         run: |
           if [ ! -f debug.keystore ] && [ -f debug.keystore.base64 ]; then
             tr -d '\r\n' < debug.keystore.base64 | base64 -d > debug.keystore
           fi
+          ls -lh debug.keystore
 
       - name: Set up Gradle 9.3.1
         uses: gradle/actions/setup-gradle@v4
@@ -33,7 +38,7 @@ jobs:
           gradle-version: '9.3.1'
 
       - name: Build Debug APK
-        run: gradle assembleDebug --no-daemon
+        run: gradle assembleDebug --no-daemon --no-configuration-cache -Dorg.gradle.jvmargs="-Xmx3g" --stacktrace
 
       - name: Upload ClipCraft Debug APK
         uses: actions/upload-artifact@v4
