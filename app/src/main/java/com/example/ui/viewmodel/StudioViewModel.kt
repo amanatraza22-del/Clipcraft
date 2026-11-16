@@ -6,7 +6,11 @@ import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.ai.AiSceneVisualGenerator
 import com.example.ai.AiShortGenerator
+import com.example.ai.AiVideoGeneratorPipeline
+import com.example.ai.VideoClipBuildRequest
+import com.example.ai.VideoPipelineStage
 import com.example.data.model.ShortProject
 import com.example.data.model.ShortScene
 import com.example.data.repository.ShortProjectRepository
@@ -67,10 +71,17 @@ class StudioViewModel(
     private val voiceoverEngine: VoiceoverEngine,
     private val videoExporter: ShortVideoExporter,
     private val currentUserId: String,
-    appContext: Context
+    appContext: Context,
+    private val aiVisualGenerator: AiSceneVisualGenerator = AiSceneVisualGenerator()
 ) : ViewModel() {
 
     private val appCtx = appContext.applicationContext
+    private val videoPipeline = AiVideoGeneratorPipeline(
+        shortGenerator = aiGenerator,
+        visualGenerator = aiVisualGenerator,
+        voiceoverEngine = voiceoverEngine,
+        videoExporter = videoExporter
+    )
 
     val projectsState: StateFlow<ProjectsUiState> = repository.observeShorts(currentUserId)
         .map<List<ShortProject>, ProjectsUiState> { ProjectsUiState.Success(it) }
@@ -121,6 +132,9 @@ class StudioViewModel(
 
     private val _statusBanner = MutableStateFlow<String?>(null)
     val statusBanner: StateFlow<String?> = _statusBanner.asStateFlow()
+
+    private val _includeAiSceneVisuals = MutableStateFlow(false)
+    val includeAiSceneVisuals: StateFlow<Boolean> = _includeAiSceneVisuals.asStateFlow()
 
     private var tickerJob: Job? = null
 
@@ -185,6 +199,10 @@ class StudioViewModel(
         _statusBanner.value = null
     }
 
+    fun setIncludeAiSceneVisuals(enabled: Boolean) {
+        _includeAiSceneVisuals.value = enabled
+    }
+
     fun generateAiShort() {
         val draft = _activeDraft.value
         if (draft.topic.isBlank()) {
@@ -223,6 +241,23 @@ class StudioViewModel(
                     totalMs = generatedDraft.durationSec * 1000L
                 )
 
+                if (_includeAiSceneVisuals.value) {
+                    val generatedFrames = aiVisualGenerator.generateSceneKeyframes(
+                        topic = generatedDraft.topic,
+                        style = generatedDraft.style,
+                        scenes = generatedDraft.scenes,
+                        maxKeyframes = 3,
+                        onFrameProgress = { done, total ->
+                            _generationState.value = GenerationUiState.Loading(
+                                "Generating AI scene visual ${done.coerceAtMost(total)}/$total (Nano Banana)..."
+                            )
+                        }
+                    )
+                    if (generatedFrames.isNotEmpty()) {
+                        _attachedPhotos.value = generatedFrames
+                    }
+                }
+
                 _generationState.value = GenerationUiState.Loading("Synthesizing ${generatedDraft.voiceProfile} voiceover...")
                 synthesizeVoiceoverInternal(generatedDraft)
 
@@ -236,6 +271,89 @@ class StudioViewModel(
                 _generationState.value = GenerationUiState.Error(
                     e.localizedMessage ?: "AI generation failed. Check connection and App Check status."
                 )
+            }
+        }
+    }
+
+    fun generateFull20sVideoClip() {
+        val draft = _activeDraft.value
+        if (draft.topic.isBlank()) {
+            _generationState.value = GenerationUiState.Error("Enter a topic or prompt first.")
+            return
+        }
+        stopPlayback()
+
+        viewModelScope.launch {
+            _generationState.value = GenerationUiState.Loading("Starting 20s AI video pipeline...")
+            _exportState.value = ExportUiState.Exporting(0.03f)
+            try {
+                val buildResult = videoPipeline.generateAndExportClip(
+                    request = VideoClipBuildRequest(
+                        userId = currentUserId,
+                        existingProject = draft,
+                        promptTopic = draft.topic,
+                        style = draft.style,
+                        durationSec = draft.durationSec.toInt(),
+                        voiceProfile = draft.voiceProfile,
+                        attachedPhotos = _attachedPhotos.value,
+                        generateAiVisuals = _includeAiSceneVisuals.value
+                    ),
+                    onStage = { stage ->
+                        when (stage) {
+                            is VideoPipelineStage.PlanningStoryboard -> {
+                                _generationState.value = GenerationUiState.Loading(stage.message)
+                            }
+                            is VideoPipelineStage.GeneratingVisuals -> {
+                                _generationState.value = GenerationUiState.Loading(
+                                    "Generating AI scene frame ${stage.completed}/${stage.total}..."
+                                )
+                            }
+                            is VideoPipelineStage.SynthesizingVoiceover -> {
+                                _generationState.value = GenerationUiState.Loading(stage.message)
+                            }
+                            is VideoPipelineStage.RenderingVideo -> {
+                                _generationState.value = GenerationUiState.Loading(
+                                    "Encoding ${draft.durationSec}s MP4 clip (${(stage.progress * 100).toInt()}%)..."
+                                )
+                                _exportState.value = ExportUiState.Exporting(stage.progress)
+                            }
+                        }
+                    },
+                    onStoryboardReady = { project, threats ->
+                        if (threats > 0) {
+                            _threatsNeutralized.value += threats
+                        }
+                        _activeDraft.value = project
+                        _playbackState.value = PlaybackState(
+                            isPlaying = false,
+                            currentMs = 0L,
+                            totalMs = project.durationSec * 1000L
+                        )
+                    }
+                )
+
+                if (buildResult.sceneBitmaps.isNotEmpty()) {
+                    _attachedPhotos.value = buildResult.sceneBitmaps
+                }
+                _voiceoverFile.value = buildResult.voiceoverFile
+                _voiceoverStatus.value = buildResult.voiceoverStatus
+                _exportState.value = ExportUiState.Exported(
+                    file = buildResult.exportedVideo.file,
+                    includesAudio = buildResult.exportedVideo.includesAudio,
+                    durationSec = buildResult.exportedVideo.durationSec
+                )
+
+                saveDraftInternal(buildResult.project)
+                _generationState.value = GenerationUiState.Ready(
+                    "${buildResult.exportedVideo.durationSec}s AI MP4 clip generated! Ready to Save or Share."
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "Full 20s AI video pipeline failed", e)
+                val msg = e.localizedMessage ?: "AI video clip generation failed."
+                _generationState.value = GenerationUiState.Error(msg)
+                _exportState.value = ExportUiState.Error(msg)
             }
         }
     }

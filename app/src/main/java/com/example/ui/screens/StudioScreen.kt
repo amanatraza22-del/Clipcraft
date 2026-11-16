@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -57,6 +58,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -92,6 +94,7 @@ fun StudioScreen(
     exportState: ExportUiState,
     playbackState: PlaybackState,
     attachedPhotos: List<Bitmap>,
+    includeAiSceneVisuals: Boolean,
     voiceoverStatus: String,
     threatsNeutralized: Int,
     onTopicChange: (String) -> Unit,
@@ -105,7 +108,9 @@ fun StudioScreen(
     onSceneCaptionChange: (Int, String) -> Unit,
     onPhotosPicked: (List<Bitmap>) -> Unit,
     onClearPhotos: () -> Unit,
+    onToggleAiSceneVisuals: (Boolean) -> Unit,
     onGenerateClick: () -> Unit,
+    onGenerateVideoClipClick: () -> Unit,
     onAutoCaptionScript: () -> Unit,
     onResynthesizeVoice: () -> Unit,
     onTogglePlay: () -> Unit,
@@ -373,11 +378,45 @@ fun StudioScreen(
                         }
                     }
 
+                    // Optional AI Scene Keyframe Toggle (Nano Banana vs Free Studio Backdrop)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainer)
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                            Text(
+                                text = "AI Scene Keyframes (Nano Banana)",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (includeAiSceneVisuals) {
+                                    "Generates 3 custom AI scene images via Firebase AI Logic (requires Blaze plan)"
+                                } else {
+                                    "Off: Uses free animated Studio Backdrops or your attached photos"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = includeAiSceneVisuals,
+                            onCheckedChange = onToggleAiSceneVisuals,
+                            modifier = Modifier.testTag("ai_visuals_switch")
+                        )
+                    }
+
                     // Generate CTA
                     val isGenerating = generationState is GenerationUiState.Loading
+                    val isExporting = exportState is ExportUiState.Exporting
                     Button(
                         onClick = onGenerateClick,
-                        enabled = !isGenerating,
+                        enabled = !isGenerating && !isExporting,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(54.dp)
@@ -395,7 +434,7 @@ fun StudioScreen(
                                 strokeWidth = 2.dp
                             )
                             Spacer(Modifier.width(10.dp))
-                            Text((generationState as GenerationUiState.Loading).stage)
+                            Text((generationState as GenerationUiState.Loading).stage, maxLines = 1)
                         } else {
                             Icon(Icons.Filled.AutoAwesome, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
@@ -405,6 +444,24 @@ fun StudioScreen(
                                 fontWeight = FontWeight.Bold
                             )
                         }
+                    }
+
+                    OutlinedButton(
+                        onClick = onGenerateVideoClipClick,
+                        enabled = !isGenerating && !isExporting,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                            .testTag("generate_video_clip_button"),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Icon(Icons.Filled.Videocam, contentDescription = null, tint = CyberCyan)
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "One-Tap: Generate & Render ${draft.durationSec}s MP4 Clip",
+                            color = CyberCyan,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
 
                     when (generationState) {

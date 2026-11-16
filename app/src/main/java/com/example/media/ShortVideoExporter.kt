@@ -136,6 +136,7 @@ class ShortVideoExporter(private val context: Context) {
             color = Color.argb(24, 255, 77, 109)
             strokeWidth = 2f
         }
+        val fadePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
 
         try {
             for (frameIndex in 0 until totalFrames) {
@@ -165,7 +166,8 @@ class ShortVideoExporter(private val context: Context) {
                         pillPaint = pillPaint,
                         pillTextPaint = pillTextPaint,
                         gridCyanPaint = gridCyanPaint,
-                        gridCoralPaint = gridCoralPaint
+                        gridCoralPaint = gridCoralPaint,
+                        fadePaint = fadePaint
                     )
                 } finally {
                     inputSurface.unlockCanvasAndPost(canvas)
@@ -306,21 +308,50 @@ class ShortVideoExporter(private val context: Context) {
         pillPaint: Paint,
         pillTextPaint: TextPaint,
         gridCyanPaint: Paint,
-        gridCoralPaint: Paint
+        gridCoralPaint: Paint,
+        fadePaint: Paint
     ) {
         canvas.drawColor(Color.parseColor("#0A0B10"))
 
         val activeSceneIndex = project.scenes.indexOfFirst { timeMs in it.startMs..it.endMs }
             .takeIf { it >= 0 } ?: 0
         val activeScene = project.scenes.getOrNull(activeSceneIndex)
+        val sceneStart = activeScene?.startMs ?: 0L
+        val sceneEnd = activeScene?.endMs ?: (project.durationSec * 1000L)
+        val sceneSpan = (sceneEnd - sceneStart).coerceAtLeast(1000L)
+        val elapsedInScene = (timeMs - sceneStart).coerceAtLeast(0L)
+        val sceneProgress = (elapsedInScene.toFloat() / sceneSpan.toFloat()).coerceIn(0f, 1f)
 
-        // Draw user photo with Ken Burns zoom, Obsidian Grid, or studio backdrop
+        // Draw user/AI scene photos with alternating Ken Burns motion & 350ms crossfade
         if (photos.isNotEmpty()) {
-            val photo = photos[activeSceneIndex % photos.size]
-            val zoom = 1f + 0.08f * ((timeMs % 5000L) / 5000f)
+            val currentIdx = activeSceneIndex % photos.size
+            val photo = photos[currentIdx]
+            if (activeSceneIndex > 0 && photos.size > 1 && elapsedInScene < 350L) {
+                val prevPhoto = photos[(activeSceneIndex - 1) % photos.size]
+                fadePaint.alpha = 255
+                canvas.save()
+                canvas.scale(1.06f, 1.06f, width / 2f, height / 2f)
+                canvas.drawBitmap(prevPhoto, 0f, 0f, fadePaint)
+                canvas.restore()
+                fadePaint.alpha = ((elapsedInScene / 350f) * 255f).toInt().coerceIn(0, 255)
+            } else {
+                fadePaint.alpha = 255
+            }
+
+            val zoom = when (activeSceneIndex % 3) {
+                0 -> 1.0f + 0.08f * sceneProgress
+                1 -> 1.08f - 0.06f * sceneProgress
+                else -> 1.02f + 0.07f * sceneProgress
+            }
+            val panX = when (activeSceneIndex % 3) {
+                0 -> -14f * sceneProgress
+                1 -> 14f * sceneProgress
+                else -> 0f
+            }
             canvas.save()
+            canvas.translate(panX, 0f)
             canvas.scale(zoom, zoom, width / 2f, height / 2f)
-            canvas.drawBitmap(photo, 0f, 0f, null)
+            canvas.drawBitmap(photo, 0f, 0f, fadePaint)
             canvas.restore()
         } else if (project.backdropTheme == "Obsidian Grid") {
             scrimPaint.shader = LinearGradient(
@@ -347,7 +378,7 @@ class ShortVideoExporter(private val context: Context) {
                 y += step
             }
         } else if (backdropBitmap != null) {
-            val zoom = 1f + 0.05f * progress
+            val zoom = 1f + 0.06f * progress
             canvas.save()
             canvas.scale(zoom, zoom, width / 2f, height / 2f)
             canvas.drawBitmap(backdropBitmap, 0f, 0f, null)

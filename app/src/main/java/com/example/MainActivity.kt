@@ -170,6 +170,7 @@ fun ClipCraftMainWorkspace(
     val exportState by viewModel.exportState.collectAsStateWithLifecycle()
     val playbackState by viewModel.playbackState.collectAsStateWithLifecycle()
     val attachedPhotos by viewModel.attachedPhotos.collectAsStateWithLifecycle()
+    val includeAiSceneVisuals by viewModel.includeAiSceneVisuals.collectAsStateWithLifecycle()
     val voiceoverStatus by viewModel.voiceoverStatus.collectAsStateWithLifecycle()
     val screenShieldEnabled by viewModel.screenShieldEnabled.collectAsStateWithLifecycle()
     val threatsNeutralized by viewModel.threatsNeutralized.collectAsStateWithLifecycle()
@@ -329,6 +330,7 @@ fun ClipCraftMainWorkspace(
                             exportState = exportState,
                             playbackState = playbackState,
                             attachedPhotos = attachedPhotos,
+                            includeAiSceneVisuals = includeAiSceneVisuals,
                             voiceoverStatus = voiceoverStatus,
                             threatsNeutralized = threatsNeutralized,
                             onTopicChange = viewModel::updateTopic,
@@ -342,7 +344,9 @@ fun ClipCraftMainWorkspace(
                             onSceneCaptionChange = viewModel::updateSceneCaption,
                             onPhotosPicked = viewModel::setAttachedPhotos,
                             onClearPhotos = viewModel::clearAttachedPhotos,
+                            onToggleAiSceneVisuals = viewModel::setIncludeAiSceneVisuals,
                             onGenerateClick = viewModel::generateAiShort,
+                            onGenerateVideoClipClick = viewModel::generateFull20sVideoClip,
                             onAutoCaptionScript = viewModel::autoCaptionEditedScript,
                             onResynthesizeVoice = viewModel::resynthesizeVoiceover,
                             onTogglePlay = viewModel::togglePlayPreview,
